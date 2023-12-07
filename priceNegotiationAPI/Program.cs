@@ -1,8 +1,20 @@
+using Microsoft.EntityFrameworkCore;
+using priceNegotiationAPI.Data;
+using Serilog;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+Log.Logger = new LoggerConfiguration().MinimumLevel.Debug()
+    .WriteTo.File("log/negotiationLogs.txt", rollingInterval: RollingInterval.Day).CreateLogger() ;
+
+builder.Host.UseSerilog();
+
+builder.Services.AddDbContext<ApplicationDbContext>(option => {
+    option.UseSqlite(builder.Configuration.GetConnectionString("DefaultSQLConnection"));
+});
+builder.Services.AddControllers().AddNewtonsoftJson();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
