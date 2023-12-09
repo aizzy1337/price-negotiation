@@ -23,17 +23,17 @@ namespace priceNegotiationAPI.Controllers
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<IEnumerable<NegotiationDTO>> GetNegotiations()
+        public async Task<ActionResult<IEnumerable<NegotiationDTO>>> GetNegotiations()
         {
             _logger.LogInformation("Getting all negotiations");
-            return Ok(_db.Negotiations.ToList());
+            return Ok(await _db.Negotiations.ToListAsync());
         }
 
         [HttpGet("{id:int}", Name = "GetNegotiation")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<NegotiationDTO> GetNegotiation(int id)
+        public async Task<ActionResult<NegotiationDTO>> GetNegotiation(int id)
         {
             if (id < 1)
             {
@@ -41,7 +41,7 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
             
-            var negotiation = _db.Negotiations.FirstOrDefault(x => x.Id == id);
+            var negotiation = await _db.Negotiations.FirstOrDefaultAsync(x => x.Id == id);
             if (negotiation == null)
             {
                 _logger.LogError("Object of given index was not found");
@@ -52,9 +52,10 @@ namespace priceNegotiationAPI.Controllers
         }
 
         [HttpPost]
+        [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<NegotiationDTO> CreateNegotiation([FromBody] NegotiationDTO negotiationDTO)
+        public async Task<ActionResult<NegotiationDTO>> CreateNegotiation([FromBody] NegotiationDTO negotiationDTO)
         {
             if (negotiationDTO == null)
             {
@@ -68,19 +69,13 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest(negotiationDTO);
             }
 
-            if (_db.Negotiations.Any(x => x.Id == negotiationDTO.Id))
-            {
-                _logger.LogError("Object with given ID already exists");
-                return BadRequest(negotiationDTO);
-            }
-
             if (negotiationDTO.Accepted == true || negotiationDTO.WasHandled == true)
             {
                 _logger.LogError("Object can't be accepted or handled on creation");
                 return BadRequest(negotiationDTO);
             }
 
-            var product = _db.Products.FirstOrDefault(x => x.Id == negotiationDTO.ProductId);
+            var product = await _db.Products.FirstOrDefaultAsync(x => x.Id == negotiationDTO.ProductId);
             if (product == null)
             {
                 _logger.LogError("Related object was not found");
@@ -101,7 +96,7 @@ namespace priceNegotiationAPI.Controllers
                 _logger.LogError("Can't create new negotiation when previous is unhandled");
                 return BadRequest(negotiationDTO);
             }
-            else if(product.Negotiations.Count > 4)
+            else if(product.Negotiations.Count == 4)
             {
                 _logger.LogError("Only four negotiations for one product are allowed");
                 return BadRequest(negotiationDTO);
@@ -109,7 +104,6 @@ namespace priceNegotiationAPI.Controllers
 
             Negotiation model = new Negotiation()
             {
-                Id = negotiationDTO.Id,
                 ProposedPrice = negotiationDTO.ProposedPrice,
                 Accepted = negotiationDTO.Accepted,
                 WasHandled = negotiationDTO.WasHandled,
@@ -119,7 +113,7 @@ namespace priceNegotiationAPI.Controllers
             };
 
             _db.Negotiations.Add(model);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             return CreatedAtRoute("GetNegotiation", new { id = negotiationDTO.Id }, negotiationDTO);
         }
@@ -128,7 +122,7 @@ namespace priceNegotiationAPI.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult DeleteNegotiation(int id)
+        public async Task<IActionResult> DeleteNegotiation(int id)
         {
             if (id < 1)
             {
@@ -136,7 +130,7 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var negotiation = _db.Negotiations.FirstOrDefault(x => x.Id == id);
+            var negotiation = await _db.Negotiations.FirstOrDefaultAsync(x => x.Id == id);
             if (negotiation == null)
             {
                 _logger.LogError("Object of given index was not found");
@@ -144,7 +138,7 @@ namespace priceNegotiationAPI.Controllers
             }
             
             _db.Negotiations.Remove(negotiation);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
             return NoContent();
         }
 
@@ -152,7 +146,7 @@ namespace priceNegotiationAPI.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult UpdateNegotiation(int id, [FromBody] NegotiationDTO negotiationDTO)
+        public async Task<IActionResult> UpdateNegotiation(int id, [FromBody] NegotiationDTO negotiationDTO)
         {
             if (negotiationDTO == null)
             {
@@ -160,14 +154,14 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var negotiation = _db.Negotiations.FirstOrDefault(x => x.Id == id);
+            var negotiation = await _db.Negotiations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
             if (negotiation == null)
             {
                 _logger.LogError("Object of given index was not found");
                 return NotFound();
             }
 
-            var product = _db.Products.FirstOrDefault(x => x.Id == negotiationDTO.ProductId);
+            var product = await _db.Products.AsNoTracking().FirstOrDefaultAsync(x => x.Id == negotiationDTO.ProductId);
             if (product == null)
             {
                 _logger.LogError("Related object was not found");
@@ -196,7 +190,7 @@ namespace priceNegotiationAPI.Controllers
             };
 
             _db.Negotiations.Update(model);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             return NoContent();
         }
@@ -205,7 +199,7 @@ namespace priceNegotiationAPI.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult HandleNegotiation(int id, JsonPatchDocument<NegotiationDTO> patchDTO)
+        public async Task<IActionResult> HandleNegotiation(int id, JsonPatchDocument<NegotiationDTO> patchDTO)
         {
             if (patchDTO == null)
             {
@@ -213,7 +207,7 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var negotiation = _db.Negotiations.AsNoTracking().FirstOrDefault(x => x.Id == id);
+            var negotiation = await _db.Negotiations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
             if (negotiation == null)
             {
                 _logger.LogError("Object of given index was not found");
@@ -267,7 +261,7 @@ namespace priceNegotiationAPI.Controllers
                 }
 
                 _db.Negotiations.Update(model);
-                _db.SaveChanges();
+                await _db.SaveChangesAsync();
             }
 
             return NoContent();

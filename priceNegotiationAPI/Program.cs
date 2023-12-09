@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 Log.Logger = new LoggerConfiguration().MinimumLevel.Debug()
-    .WriteTo.File("log/negotiationLogs.txt", rollingInterval: RollingInterval.Day).CreateLogger() ;
+    .WriteTo.File("log/apiLog.txt", rollingInterval: RollingInterval.Day).CreateLogger() ;
 
 builder.Host.UseSerilog();
 
