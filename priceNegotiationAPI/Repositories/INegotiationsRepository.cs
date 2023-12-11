@@ -4,6 +4,6 @@ namespace priceNegotiationAPI.Repositories
 {
     public interface INegotiationsRepository : IRepository<Negotiation>
     {
-        void HandleNegotiation(int id, bool accepted);
+        Task<bool> HandleNegotiation(Negotiation negotiation, bool accepted);
     }
 }

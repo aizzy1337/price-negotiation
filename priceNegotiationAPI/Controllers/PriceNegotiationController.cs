@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using priceNegotiationAPI.Data;
 using priceNegotiationAPI.Models;
 using priceNegotiationAPI.Models.Dto;
+using priceNegotiationAPI.UnitsOfWork;
 
 namespace priceNegotiationAPI.Controllers
 {
@@ -12,13 +13,13 @@ namespace priceNegotiationAPI.Controllers
     [ApiController]
     public class PriceNegotiationController : ControllerBase
     {
-        private readonly ILogger<PriceNegotiationController> _logger;
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger _logger;
 
-        public PriceNegotiationController(ILogger<PriceNegotiationController> logger, ApplicationDbContext db)
+        public PriceNegotiationController(IUnitOfWork unitOfWork, ILoggerFactory loggerFactory)
         {
-            _logger = logger;
-            _db = db;
+            _unitOfWork = unitOfWork;
+            _logger = loggerFactory.CreateLogger("/log/priceNegotiationControllerLog");
         }
 
         [HttpGet]
@@ -26,7 +27,7 @@ namespace priceNegotiationAPI.Controllers
         public async Task<ActionResult<IEnumerable<NegotiationDTO>>> GetNegotiations()
         {
             _logger.LogInformation("Getting all negotiations");
-            return Ok(await _db.Negotiations.ToListAsync());
+            return Ok(await _unitOfWork.Negotiations.GetAll());
         }
 
         [HttpGet("{id:int}", Name = "GetNegotiation")]
@@ -41,7 +42,7 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
             
-            var negotiation = await _db.Negotiations.FirstOrDefaultAsync(x => x.Id == id);
+            var negotiation = await _unitOfWork.Negotiations.GetById(id);
             if (negotiation == null)
             {
                 _logger.LogError("Object of given index was not found");
@@ -75,7 +76,7 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest(negotiationDTO);
             }
 
-            var product = await _db.Products.FirstOrDefaultAsync(x => x.Id == negotiationDTO.ProductId);
+            var product = await _unitOfWork.Products.GetById(negotiationDTO.ProductId);
             if (product == null)
             {
                 _logger.LogError("Related object was not found");
@@ -112,8 +113,8 @@ namespace priceNegotiationAPI.Controllers
                 CreatedDate = DateTime.Now,
             };
 
-            _db.Negotiations.Add(model);
-            await _db.SaveChangesAsync();
+            await _unitOfWork.Negotiations.Add(model);
+            await _unitOfWork.CompleteAsync();
 
             return CreatedAtRoute("GetNegotiation", new { id = negotiationDTO.Id }, negotiationDTO);
         }
@@ -130,15 +131,15 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var negotiation = await _db.Negotiations.FirstOrDefaultAsync(x => x.Id == id);
+            var negotiation = await _unitOfWork.Negotiations.GetById(id);
             if (negotiation == null)
             {
                 _logger.LogError("Object of given index was not found");
                 return NotFound();
             }
-            
-            _db.Negotiations.Remove(negotiation);
-            await _db.SaveChangesAsync();
+
+            await _unitOfWork.Negotiations.Remove(negotiation);
+            await _unitOfWork.CompleteAsync();
             return NoContent();
         }
 
@@ -154,14 +155,14 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var negotiation = await _db.Negotiations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+            var negotiation = await _unitOfWork.Negotiations.GetById(id);
             if (negotiation == null)
             {
                 _logger.LogError("Object of given index was not found");
                 return NotFound();
             }
 
-            var product = await _db.Products.AsNoTracking().FirstOrDefaultAsync(x => x.Id == negotiationDTO.ProductId);
+            var product = await _unitOfWork.Products.GetById(negotiationDTO.ProductId);
             if (product == null)
             {
                 _logger.LogError("Related object was not found");
@@ -189,12 +190,22 @@ namespace priceNegotiationAPI.Controllers
                 CreatedDate = DateTime.Now,
             };
 
-            _db.Negotiations.Update(model);
-            await _db.SaveChangesAsync();
+            await _unitOfWork.Negotiations.Update(model);
+            await _unitOfWork.CompleteAsync();
 
             return NoContent();
         }
 
+        /*
+         * Usage:
+         * [
+            {
+               "path": "/Accepted", - field that defines if negotiation was accepted
+               "op": "replace", - operation we are using
+               "value": "true" - true/false
+            }
+           ]
+        */
         [HttpPatch("{id:int}", Name = "HandleNegotiation")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -207,7 +218,7 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var negotiation = await _db.Negotiations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+            var negotiation = await _unitOfWork.Negotiations.GetById(id);
             if (negotiation == null)
             {
                 _logger.LogError("Object of given index was not found");
@@ -243,25 +254,8 @@ namespace priceNegotiationAPI.Controllers
             }
             else
             {
-                Negotiation model = new Negotiation()
-                {
-                    Id = modelDTO.Id,
-                    ProposedPrice = modelDTO.ProposedPrice,
-                    Accepted = modelDTO.Accepted,
-                    WasHandled = modelDTO.WasHandled,
-                    ProductId = modelDTO.ProductId,
-                    Product = negotiation.Product,
-                    CreatedDate = negotiation.CreatedDate,
-                };
-
-                if (!ModelState.IsValid)
-                {
-                    _logger.LogError("ModelState is not valid");
-                    return BadRequest(ModelState);
-                }
-
-                _db.Negotiations.Update(model);
-                await _db.SaveChangesAsync();
+                await _unitOfWork.Negotiations.HandleNegotiation(negotiation, modelDTO.Accepted);
+                await _unitOfWork.CompleteAsync();
             }
 
             return NoContent();

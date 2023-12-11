@@ -3,28 +3,29 @@ using priceNegotiationAPI.Repositories;
 
 namespace priceNegotiationAPI.UnitsOfWork
 {
-    public class UnitOfWork : IUnitOfWork
+    public class UnitOfWork : IUnitOfWork, IDisposable
     {
-        private readonly ApplicationDbContext context;
+        private readonly ApplicationDbContext _context;
+        private readonly ILogger _logger;
+        public IProductsRepository Products { get; private set; }
+        public INegotiationsRepository Negotiations { get; private set; }
 
-        public UnitOfWork(ApplicationDbContext context)
+        public UnitOfWork(ApplicationDbContext context, ILoggerFactory loggerFactory)
         {
-            this.context = context;
-            Products = new ProductsRepository(context);
-            Negotiations = new NegotiationsRepository(context);
+            _context = context;
+            _logger = loggerFactory.CreateLogger("log/repositoryLog");
+            Products = new ProductsRepository(context, _logger);
+            Negotiations = new NegotiationsRepository(context, _logger);
         }
 
-        public IProductsRepository Products { get; set; }
-        public INegotiationsRepository Negotiations { get; set; }
-
-        public int Complete()
+        public async Task CompleteAsync()
         {
-            return context.SaveChanges();
+            await _context.SaveChangesAsync();
         }
 
         public void Dispose()
         {
-            context.Dispose();
+            _context.Dispose();
         }
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using priceNegotiationAPI.Data;
 using priceNegotiationAPI.Models;
 using priceNegotiationAPI.Models.Dto;
+using priceNegotiationAPI.UnitsOfWork;
 
 namespace priceNegotiationAPI.Controllers
 {
@@ -11,13 +12,13 @@ namespace priceNegotiationAPI.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
-        private readonly ILogger<PriceNegotiationController> _logger;
-        private readonly ApplicationDbContext _db;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger _logger;
 
-        public ProductsController(ILogger<PriceNegotiationController> logger, ApplicationDbContext db)
+        public ProductsController(IUnitOfWork unitOfWork, ILoggerFactory loggerFactory)
         {
-            _logger = logger;
-            _db = db;
+            _logger = loggerFactory.CreateLogger("/log/productsControllerLog");
+            _unitOfWork = unitOfWork;
         }
 
         [HttpGet]
@@ -25,7 +26,7 @@ namespace priceNegotiationAPI.Controllers
         public async Task<ActionResult<IEnumerable<ProductDTO>>> GetNegotiations()
         {
             _logger.LogInformation("Getting all products");
-            return Ok(await _db.Products.ToListAsync());
+            return Ok(await _unitOfWork.Products.GetAll());
         }
 
         [HttpGet("{id:int}", Name = "GetProduct")]
@@ -40,7 +41,7 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var product = await _db.Products.FirstOrDefaultAsync(x => x.Id == id);
+            var product = await _unitOfWork.Products.GetById(id);
             if (product == null)
             {
                 _logger.LogError("Object of given index was not found");
@@ -82,8 +83,8 @@ namespace priceNegotiationAPI.Controllers
                 CreatedDate = DateTime.Now
             };
 
-            _db.Products.Add(model);
-            await _db.SaveChangesAsync();
+            await _unitOfWork.Products.Add(model);
+            await _unitOfWork.CompleteAsync();
 
             return CreatedAtRoute("GetProduct", new { id = productDTO.Id }, productDTO);
         }
@@ -100,15 +101,15 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var product = await _db.Products.FirstOrDefaultAsync(x => x.Id == id);
+            var product = await _unitOfWork.Products.GetById(id);
             if (product == null)
             {
                 _logger.LogError("Object of given index was not found");
                 return NotFound();
             }
 
-            _db.Products.Remove(product);
-            await _db.SaveChangesAsync();
+            await _unitOfWork.Products.Remove(product);
+            await _unitOfWork.CompleteAsync();
             return NoContent();
         }
 
@@ -124,7 +125,7 @@ namespace priceNegotiationAPI.Controllers
                 return BadRequest();
             }
 
-            var product = await _db.Products.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+            var product = await _unitOfWork.Products.GetById(id);
             if (product == null)
             {
                 _logger.LogError("Object of given index was not found");
@@ -146,8 +147,8 @@ namespace priceNegotiationAPI.Controllers
                 CreatedDate = DateTime.Now
             };
 
-            _db.Products.Update(model);
-            await _db.SaveChangesAsync();
+            await _unitOfWork.Products.Update(model);
+            await _unitOfWork.CompleteAsync();
 
             return NoContent();
         }

@@ -5,44 +5,43 @@ namespace priceNegotiationAPI.Repositories
 {
     public class Repository<TEntity> : IRepository<TEntity> where TEntity : class
     {
-        protected readonly DbContext context;
-        internal DbSet<TEntity> dbSet;
+        protected readonly DbContext _context;
+        internal DbSet<TEntity> _dbSet;
         protected readonly ILogger _logger;
 
-        public Repository(DbContext context)
+        public Repository(DbContext context, ILogger logger)
         {
-            this.context = context;
+            _context = context;
+            _logger = logger;
+            _dbSet = _context.Set<TEntity>();
         }
 
-        public Task<TEntity> GetById(int id)
+        public virtual async Task<TEntity?> GetById(int id)
         {
-            return context.Set<TEntity>().Find(id);
+            return await _dbSet.FindAsync(id);
         }
 
-        public Task<IEnumerable<TEntity>> GetAll()
+        public virtual async Task<IEnumerable<TEntity>> GetAll()
         {
-            return context.Set<TEntity>().ToList();
+            return await _dbSet.AsNoTracking().ToListAsync();
         }
 
-        public Task<IEnumerable<TEntity>> Find(Expression<Func<TEntity, bool>> predicate)
+        public virtual async Task<bool> Add(TEntity entity)
         {
-            return context.Set<TEntity>().Where(predicate);
+            await _dbSet.AddAsync(entity);
+            return true;
         }
 
-        public Task<bool> Add(TEntity entity)
+        public virtual async Task<bool> Update(TEntity entity)
         {
-            context.Set<TEntity>().Add(entity);
+            _dbSet.Update(entity);
+            return true;
         }
 
-        public Task<bool> Update(TEntity entity)
+        public virtual async Task<bool> Remove(TEntity entity)
         {
-            context.Set<TEntity>().Update(entity);
-        }
-
-        public Task<bool> Remove(int id)
-        {
-            TEntity entityToDelete = context.Set<TEntity>().Find(id);
-            context.Set<TEntity>().Remove(entityToDelete);
+            _dbSet.Remove(entity);
+            return true;
         }
 
     }

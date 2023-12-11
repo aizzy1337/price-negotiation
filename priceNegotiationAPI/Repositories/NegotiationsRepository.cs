@@ -1,27 +1,45 @@
-﻿using priceNegotiationAPI.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using priceNegotiationAPI.Data;
 using priceNegotiationAPI.Models;
 
 namespace priceNegotiationAPI.Repositories
 {
     public class NegotiationsRepository : Repository<Negotiation>, INegotiationsRepository
     {
-        public NegotiationsRepository(ApplicationDbContext context)
-            : base(context) { }
+        public NegotiationsRepository(ApplicationDbContext context, ILogger logger)
+            : base(context, logger) { }
 
-        public void HandleNegotiation(int id, bool accepted)
+        public async Task<bool> HandleNegotiation(Negotiation negotiation, bool accepted)
         {
-            Negotiation negotiationToHandle = context.Set<Negotiation>().Find(id);
-            if (negotiationToHandle != null)
+            try
             {
-                negotiationToHandle.Accepted = accepted;
-                negotiationToHandle.WasHandled = true;
-                context.Set<Negotiation>().Update(negotiationToHandle);
+                negotiation.Accepted = accepted;
+                negotiation.WasHandled = true;
+                ApplicationDbContext.Negotiations.Update(negotiation);
+                return true;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                return false;
+            }
+        }
+
+        public override async Task<Negotiation?> GetById(int id)
+        {
+            try
+            {
+                return await ApplicationDbContext.Negotiations.AsNoTracking().FirstOrDefaultAsync(n => n.Id == id);
+            }
+            catch (Exception e)
+            {
+                throw e;
             }
         }
 
         public ApplicationDbContext ApplicationDbContext
         {
-            get { return context as ApplicationDbContext; }
+            get { return _context as ApplicationDbContext; }
         }
     }
 }
