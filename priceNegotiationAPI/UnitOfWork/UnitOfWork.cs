@@ -13,7 +13,7 @@ namespace priceNegotiationAPI.UnitsOfWork
         public UnitOfWork(ApplicationDbContext context, ILoggerFactory loggerFactory)
         {
             _context = context;
-            _logger = loggerFactory.CreateLogger("log/repositoryLog");
+            _logger = loggerFactory.CreateLogger("repositoryLogger");
             Products = new ProductsRepository(context, _logger);
             Negotiations = new NegotiationsRepository(context, _logger);
         }
